@@ -17,6 +17,7 @@ import {
   generateToken,
   hashPassword,
   verifyPassword,
+  requireAdmin,
 } from "./auth";
 
 const app = express();
@@ -28,13 +29,53 @@ const INITIAL_BALANCE = 10_000;
 const MAX_BALANCE = Number.MAX_SAFE_INTEGER;
 const MAX_AMOUNT = 1_000_000;
 
+const DEMO_MARKETS = [
+  {
+    title: "Will AI make a major scientific breakthrough this year?",
+    description: "A measurable breakthrough publicly announced by a reputable scientific institution before the deadline.",
+    side: "yes" as const,
+    initialWager: 400,
+    hours: 24 * 30,
+  },
+  {
+    title: "Will the next big tech IPO price above its expected range?",
+    description: "Resolves YES if a major US technology IPO prices above the top of its announced initial range.",
+    side: "no" as const,
+    initialWager: 250,
+    hours: 24 * 45,
+  },
+  {
+    title: "Will a new record be set in the global daily temperature average?",
+    description: "Based on the final published daily global average from a recognized climate data provider.",
+    side: "yes" as const,
+    initialWager: 300,
+    hours: 24 * 60,
+  },
+  {
+    title: "Will a major streaming service launch a cheaper ad-free plan?",
+    description: "Resolves YES if a leading global streaming service publicly launches the plan before the deadline.",
+    side: "no" as const,
+    initialWager: 150,
+    hours: 24 * 21,
+  },
+];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL ?? "http://localhost:5173",
+    // In development, allow the local Next dev server on either common port.
+    // Production remains restricted to the configured client origin.
+    origin:
+      process.env.NODE_ENV === "production"
+        ? process.env.CLIENT_URL
+        : true,
   }),
 );
 
 app.use(express.json({ limit: "16kb" }));
+app.use((_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  next();
+});
 
 // ─── Errors and helpers ─────────────────────────────────
 
@@ -178,6 +219,11 @@ const resolveSchema = z.object({
   resolution: z.enum(["yes", "no"]),
 });
 
+const adminCreditSchema = z.object({
+  userId: z.string().refine(isValidObjectId, "Invalid user ID"),
+  amount: amountSchema,
+});
+
 // ─── Health check ───────────────────────────────────────
 
 app.get(`${API}/health`, (_req, res) => {
@@ -234,6 +280,7 @@ app.post(
         id: user.id,
         username: user.username,
         balance: user.balance,
+        role: roleOf(user),
       },
     });
   }),
@@ -271,6 +318,7 @@ app.post(
         id: user.id,
         username: user.username,
         balance: user.balance,
+        role: roleOf(user),
       },
     });
   }),
@@ -353,6 +401,7 @@ app.get(
         id: user.id,
         username: user.username,
         balance: user.balance,
+        role: roleOf(user),
       },
     });
   }),
@@ -382,6 +431,10 @@ app.post(
   ["/market", `${API}/market`],
   authenticate,
   asyncHandler(async (req, res) => {
+    if (req.auth?.role === "admin") {
+      throw new HttpError(403, "Admins cannot create markets");
+    }
+
     const input = parseBody(createMarketSchema, req.body);
     const userId = getUserId(req);
 
@@ -476,6 +529,10 @@ app.post(
   ["/bet", `${API}/market/bet`],
   authenticate,
   asyncHandler(async (req, res) => {
+    if (req.auth?.role === "admin") {
+      throw new HttpError(403, "Admins cannot place bets");
+    }
+
     const { marketId, amount } = parseBody(
       placeBetSchema,
       req.body,
@@ -620,6 +677,64 @@ app.get(
   }),
 );
 
+// ─── Admin routes ──────────────────────────────────────
+
+app.get(
+  `${API}/admin/markets`,
+  authenticate,
+  requireAdmin,
+  asyncHandler(async (_req, res) => {
+    const markets = await Market.find({})
+      .sort({ createdAt: -1 })
+      .populate("creatorId", "username")
+      .lean();
+
+    res.json({ markets });
+  }),
+);
+
+app.get(
+  `${API}/admin/users`,
+  authenticate,
+  requireAdmin,
+  asyncHandler(async (_req, res) => {
+    const users = await User.find({})
+      .select("username balance role createdAt")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ users });
+  }),
+);
+
+app.post(
+  `${API}/admin/credit`,
+  authenticate,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    const { userId, amount } = parseBody(adminCreditSchema, req.body);
+
+    const balance = await inTransaction(async (session) => {
+      const user = await User.findOneAndUpdate(
+        { _id: userId, balance: { $lte: MAX_BALANCE - amount } },
+        { $inc: { balance: amount } },
+        { new: true, session, runValidators: true },
+      );
+
+      if (!user) throw new HttpError(404, "User not found or balance limit exceeded");
+
+      await WalletEvent.create(
+        [{ userId, type: "deposit", amount }],
+        { session },
+      );
+
+      return user.balance;
+    });
+
+    res.json({ message: "User credited", balance });
+  }),
+);
+
 // ─── POST /resolve and /api/v1/resolve ──────────────────
 // Only the creator may resolve an expired market.
 
@@ -642,10 +757,13 @@ app.post(
         throw new HttpError(404, "Market not found");
       }
 
-      if (market.creatorId.toString() !== userId) {
+      if (
+        market.creatorId.toString() !== userId &&
+        req.auth?.role !== "admin"
+      ) {
         throw new HttpError(
           403,
-          "Only the market creator can resolve it",
+          "Only the market creator or an admin can resolve it",
         );
       }
 
@@ -869,9 +987,75 @@ app.use(errorHandler);
 async function start(): Promise<void> {
   await connectDB();
 
+  if (process.env.NODE_ENV !== "production") {
+    await seedAdminUser();
+    await seedDemoMarkets();
+  }
+
   app.listen(PORT, () => {
     console.log(`API listening on http://localhost:${PORT}`);
   });
+}
+
+async function seedAdminUser(): Promise<void> {
+  const existing = await User.findOne({ username: "admin" });
+  if (existing) return;
+
+  const admin = await User.create({
+    username: "admin",
+    passwordHash: await hashPassword("admin-password"),
+    balance: INITIAL_BALANCE,
+    role: "admin",
+  });
+
+  await WalletEvent.create({
+    userId: admin._id,
+    type: "initial_credit",
+    amount: INITIAL_BALANCE,
+  });
+
+  console.log("Seeded development admin. Admin login: admin / admin-password");
+}
+
+async function seedDemoMarkets(): Promise<void> {
+  const existing = await User.findOne({ username: "demo" });
+  if (existing || await Market.exists({ title: DEMO_MARKETS[0].title })) {
+    return;
+  }
+
+  const demo = await User.create({
+    username: "demo",
+    passwordHash: await hashPassword("demo-password"),
+    balance: INITIAL_BALANCE - DEMO_MARKETS.reduce((sum, market) => sum + market.initialWager, 0),
+  });
+
+  await WalletEvent.create({
+    userId: demo._id,
+    type: "initial_credit",
+    amount: INITIAL_BALANCE,
+  });
+
+  for (const input of DEMO_MARKETS) {
+    const market = await Market.create({
+      title: input.title,
+      description: input.description,
+      creatorId: demo._id,
+      initialWager: input.initialWager,
+      expiresAt: new Date(Date.now() + input.hours * 60 * 60 * 1000),
+      side: input.side,
+      matchedAmount: 0,
+      status: "open",
+    });
+
+    await WalletEvent.create({
+      userId: demo._id,
+      type: "bet_placed",
+      amount: -input.initialWager,
+      marketId: market._id,
+    });
+  }
+
+  console.log("Seeded demo markets. Demo login: demo / demo-password");
 }
 
 start().catch((error: unknown) => {

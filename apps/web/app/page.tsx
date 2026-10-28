@@ -1,102 +1,84 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
+type User = { id: string; username: string; balance: number; role?: "user" | "admin" };
+type Market = { _id: string; title: string; description?: string; side: "yes" | "no"; initialWager: number; matchedAmount: number; remainingWager: number; expiresAt: string; status?: "open" | "closed" | "resolved" | "cancelled"; resolution?: "yes" | "no"; creatorId: { _id: string; username: string } | string };
+type Bet = { _id: string; amount: number; outcome: "yes" | "no"; status: string; payout: number; createdAt: string; marketId: Market | string };
+type Transaction = { _id: string; type: string; amount: number; createdAt: string };
+type AdminUser = { _id: string; username: string; balance: number; role: "user" | "admin"; createdAt: string };
+const money = (v: number) => `${v.toLocaleString()} credits`;
+const signedMoney = (v: number) => `${v >= 0 ? "+" : "−"}${money(Math.abs(v))}`;
+const date = (v: string) => new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(v));
+const initials = (v: string) => v.slice(0, 2).toUpperCase();
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+function Icon({ name, size = 18 }: { name: string; size?: number }) {
+  const paths: Record<string, React.ReactNode> = {
+    grid: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
+    compass: <><circle cx="12" cy="12" r="9" /><path d="m15.5 8.5-2.1 4.9-4.9 2.1 2.1-4.9z" /></>,
+    wallet: <><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H19a1 1 0 0 1 1 1v15H6a2 2 0 0 1-2-2z" /><path d="M4 7h16v4H6a2 2 0 0 1-2-2z" /><path d="M17 15h.01" /></>,
+    activity: <path d="M3 12h4l2.2-7 4.2 14 2.2-7H21" />,
+    plus: <><path d="M12 5v14M5 12h14" /></>, search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>, arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>, close: <><path d="m6 6 12 12M18 6 6 18" /></>, chevron: <path d="m7 10 5 5 5-5" />,
+  };
+  return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
+}
 
-  return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
+async function request<T>(path: string, options: RequestInit = {}, token?: string): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, { ...options, cache: "no-store", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers ?? {}) } });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.message ?? "Something went wrong");
+  return body as T;
+}
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.dev →
-        </a>
-      </footer>
-    </div>
-  );
+  const [token, setToken] = useState<string | null>(null); const [user, setUser] = useState<User | null>(null); const [markets, setMarkets] = useState<Market[]>([]); const [bets, setBets] = useState<Bet[]>([]); const [transactions, setTransactions] = useState<Transaction[]>([]); const [adminMarkets, setAdminMarkets] = useState<Market[]>([]); const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [tab, setTab] = useState<"discover" | "portfolio" | "wallet" | "admin">("discover"); const [query, setQuery] = useState(""); const [category, setCategory] = useState("All markets"); const [modal, setModal] = useState<"auth" | "create" | "bet" | "topup" | "help" | null>(null); const [selected, setSelected] = useState<Market | null>(null); const [authMode, setAuthMode] = useState<"login" | "signup">("login"); const [notice, setNotice] = useState(""); const [loading, setLoading] = useState(false); const [darkMode, setDarkMode] = useState(false);
+  const refresh = async (activeToken = token) => {
+    const marketData = await request<{ markets: Market[] }>("/market");
+    setMarkets(marketData.markets);
+    if (!activeToken) return;
+    const [profile, betData, transactionData] = await Promise.allSettled([
+      request<{ user: User }>("/auth/profile", {}, activeToken),
+      request<{ bets: Bet[] }>("/market/bets", {}, activeToken),
+      request<{ transactions: Transaction[] }>("/auth/transactions", {}, activeToken),
+    ]);
+    if (profile.status === "fulfilled") setUser(profile.value.user);
+    if (betData.status === "fulfilled") setBets(betData.value.bets);
+    if (transactionData.status === "fulfilled") setTransactions(transactionData.value.transactions);
+    const [adminMarketData, adminUserData] = await Promise.allSettled([
+      request<{ markets: Market[] }>("/admin/markets", {}, activeToken),
+      request<{ users: AdminUser[] }>("/admin/users", {}, activeToken),
+    ]);
+    if (adminMarketData.status === "fulfilled") setAdminMarkets(adminMarketData.value.markets);
+    if (adminUserData.status === "fulfilled") setAdminUsers(adminUserData.value.users);
+  };
+  useEffect(() => { const stored = window.localStorage.getItem("kalshi-token"); const storedTheme = window.localStorage.getItem("kalshi-theme"); setToken(stored); setDarkMode(storedTheme === "dark"); refresh(stored).catch(() => undefined); }, []);
+  useEffect(() => { document.documentElement.dataset.theme = darkMode ? "dark" : "light"; window.localStorage.setItem("kalshi-theme", darkMode ? "dark" : "light"); }, [darkMode]);
+  const visibleMarkets = useMemo(() => markets.filter((m) => m.title.toLowerCase().includes(query.toLowerCase()) && (category === "All markets" || m.side === category.toLowerCase())), [markets, query, category]);
+  const closeModal = () => { setModal(null); setSelected(null); setNotice(""); };
+  const handleAuth = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setLoading(true); setNotice(""); const data = new FormData(event.currentTarget); try { const result = await request<{ token: string; user: User }>(authMode === "login" ? "/auth/signin" : "/auth/signup", { method: "POST", body: JSON.stringify({ username: data.get("username"), password: data.get("password") }) }); window.localStorage.setItem("kalshi-token", result.token); setToken(result.token); setUser(result.user); closeModal(); await refresh(result.token); } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to authenticate"); } finally { setLoading(false); } };
+  const submitAction = async (event: FormEvent<HTMLFormElement>, path: string, payload: Record<string, unknown>, success: string) => { event.preventDefault(); setLoading(true); setNotice(""); try { await request(path, { method: "POST", body: JSON.stringify(payload) }, token ?? undefined); await refresh(); closeModal(); setNotice(success); } catch (error) { setNotice(error instanceof Error ? error.message : "Request failed"); } finally { setLoading(false); } };
+  const logout = () => { window.localStorage.removeItem("kalshi-token"); setToken(null); setUser(null); setBets([]); setTransactions([]); };
+  const changeTab = (nextTab: "discover" | "portfolio" | "wallet" | "admin") => { setTab(nextTab); if (token) refresh(token).catch((error) => setNotice(error instanceof Error ? error.message : "Unable to refresh data")); };
+  const resolveMarket = async (marketId: string, resolution: "yes" | "no") => { setLoading(true); try { await request("/resolve", { method: "POST", body: JSON.stringify({ marketId, resolution }) }, token ?? undefined); await refresh(token ?? undefined); setNotice("Market resolved and payouts distributed"); } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to resolve market"); } finally { setLoading(false); } };
+  const creditUser = async (userId: string) => { setLoading(true); try { await request("/admin/credit", { method: "POST", body: JSON.stringify({ userId, amount: 1000 }) }, token ?? undefined); await refresh(token ?? undefined); setNotice("1,000 credits added to the user"); } catch (error) { setNotice(error instanceof Error ? error.message : "Unable to credit user"); } finally { setLoading(false); } };
+  return <main data-theme={darkMode ? "dark" : "light"} className={`${styles.shell} ${darkMode ? styles.dark : ""}`}>
+    <aside className={styles.sidebar}><div className={styles.brand}><span className={styles.brandMark}>K</span><span>kalshi<span className={styles.brandDot}>.</span></span></div><div className={styles.sidebarLabel}>Workspace</div><nav className={styles.nav}><button className={tab === "discover" ? styles.activeNav : ""} onClick={() => changeTab("discover")}><Icon name="compass" />Markets</button>{user?.role !== "admin" && <><button className={tab === "portfolio" ? styles.activeNav : ""} onClick={() => changeTab("portfolio")}><Icon name="activity" />My portfolio</button><button className={tab === "wallet" ? styles.activeNav : ""} onClick={() => changeTab("wallet")}><Icon name="wallet" />Wallet</button></>}{user?.role === "admin" && <button className={tab === "admin" ? styles.activeNav : ""} onClick={() => changeTab("admin")}><Icon name="grid" />Admin console</button>}</nav><div className={styles.sidebarBottom}><div className={styles.rule} /><button className={styles.help} onClick={() => setModal("help")}><span className={styles.helpIcon}>?</span>How it works</button><button className={styles.themeToggle} onClick={() => setDarkMode((value) => !value)}><span>{darkMode ? "☀" : "◐"}</span>{darkMode ? "Light mode" : "Dark mode"}</button><div className={styles.guarantee}><span>◎</span><div><strong>Play with confidence</strong><small>Virtual credits only</small></div></div></div></aside>
+    <section className={styles.content}><header className={styles.header}><div className={styles.mobileBrand}><span className={styles.brandMark}>K</span>kalshi<span className={styles.brandDot}>.</span></div><div className={styles.headerActions}><button className={styles.themeButton} aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"} onClick={() => setDarkMode((value) => !value)}>{darkMode ? "☀" : "☾"}</button>{user ? <>{user.role !== "admin" && <button className={styles.balance} onClick={() => changeTab("wallet")}><span className={styles.coin}>◎</span>{money(user.balance)}<Icon name="chevron" size={14} /></button>}<div className={styles.avatar} title={user.username}>{initials(user.username)}</div><button className={styles.logout} onClick={logout}>Log out</button></> : <button className={styles.login} onClick={() => setModal("auth")}>Log in <Icon name="arrow" size={15} /></button>}</div></header><div className={styles.mainArea}>{notice && !modal && <div className={styles.toast}>{notice}</div>}
+      {tab === "discover" && <><section className={styles.hero}><div><div className={styles.eyebrow}>THE MARKETPLACE FOR WHAT&apos;S NEXT</div><h1>Make a call.<br /><em>Back it up.</em></h1><p>Trade on the outcomes that shape the world. Simple markets, real conviction.</p></div><div className={styles.heroArt}><span className={styles.orbOne} /><span className={styles.orbTwo} /><span className={styles.ring}>✦</span></div></section><div className={styles.sectionTop}><div><h2>{user?.role === "admin" ? "Market oversight" : "Trending markets"}</h2><p>{user?.role === "admin" ? "Read-only market view. Resolve outcomes from the admin console." : "Find your edge across the most active questions."}</p></div>{token && user?.role !== "admin" && <button className={styles.createButton} onClick={() => setModal("create")}><Icon name="plus" size={16} />Create a market</button>}</div><div className={styles.filters}><label className={styles.search}><Icon name="search" size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search markets" /></label><div className={styles.filterButtons}>{["All markets", "Yes", "No"].map((item) => <button key={item} className={category === item ? styles.selectedFilter : ""} onClick={() => setCategory(item)}>{item}</button>)}</div></div><div className={styles.marketGrid}>{visibleMarkets.map((market) => <MarketCard key={market._id} market={market} readOnly={user?.role === "admin"} onBet={() => { if (!token) setModal("auth"); else if (user?.role !== "admin") { setSelected(market); setModal("bet"); } }} />)}{visibleMarkets.length === 0 && <div className={styles.empty}><div className={styles.emptyIcon}><Icon name="compass" size={24} /></div><h3>No markets yet</h3><p>Start the board by creating the first question worth trading.</p>{token && user?.role !== "admin" && <button className={styles.primaryButton} onClick={() => setModal("create")}>Create a market</button>}</div>}</div></>}
+      {tab === "portfolio" && <Portfolio bets={bets} markets={markets} />}{tab === "wallet" && <Wallet user={user} transactions={transactions} onTopUp={() => setModal("topup")} />}{tab === "admin" && user?.role === "admin" && <Admin markets={adminMarkets} users={adminUsers} onResolve={resolveMarket} onCredit={creditUser} loading={loading} />}</div></section>
+    {modal === "auth" && <Modal title={authMode === "login" ? "Welcome back" : "Create your account"} onClose={closeModal}><form className={styles.form} onSubmit={handleAuth}><p className={styles.modalIntro}>{authMode === "login" ? "Sign in to trade with virtual credits." : "Start with 10,000 virtual credits."}</p><label>Username<input name="username" minLength={3} required placeholder="your_handle" /></label><label>Password<input name="password" type="password" minLength={12} required placeholder="At least 12 characters" /></label>{notice && <div className={styles.formError}>{notice}</div>}<button className={styles.primaryButton} disabled={loading}>{loading ? "Working…" : authMode === "login" ? "Log in" : "Create account"}</button><button type="button" className={styles.switchButton} onClick={() => { setAuthMode(authMode === "login" ? "signup" : "login"); setNotice(""); }}>{authMode === "login" ? "Need an account? Sign up" : "Already have an account? Log in"}</button></form></Modal>}
+    {modal === "create" && <Modal title="Create a market" onClose={closeModal}><form className={styles.form} onSubmit={(event) => { const data = new FormData(event.currentTarget); return submitAction(event, "/market", { title: data.get("title"), description: data.get("description"), expiry: new Date(String(data.get("expiry"))).toISOString(), side: data.get("side"), initialWager: Number(data.get("wager")) }, "Market created"); }}><p className={styles.modalIntro}>Lock your opening wager and invite others to take the other side.</p><label>Market question<input name="title" required minLength={5} placeholder="Will ... by ...?" /></label><label>Context <span className={styles.optional}>optional</span><textarea name="description" rows={3} placeholder="Add the details that make this market clear." /></label><div className={styles.twoCol}><label>Expiry<input name="expiry" type="datetime-local" required /></label><label>Wager<input name="wager" type="number" min="1" required defaultValue="100" /></label></div><label>Your position<div className={styles.sideChoice}><label><input type="radio" name="side" value="yes" defaultChecked /> Yes</label><label><input type="radio" name="side" value="no" /> No</label></div></label><button className={styles.primaryButton} disabled={loading}>{loading ? "Creating…" : "Create market"}</button></form></Modal>}
+    {modal === "bet" && selected && <Modal title="Take the other side" onClose={closeModal}><form className={styles.form} onSubmit={(event) => { const data = new FormData(event.currentTarget); return submitAction(event, "/market/bet", { marketId: selected._id, amount: Number(data.get("amount")) }, "Bet placed"); }}><div className={styles.betPreview}><span className={selected.side === "yes" ? styles.yesPill : styles.noPill}>Creator: {selected.side.toUpperCase()}</span><strong>{selected.title}</strong><small>You&apos;ll automatically take the {selected.side === "yes" ? "NO" : "YES"} side.</small></div><label>Bet amount<input name="amount" type="number" min="1" max={selected.remainingWager} defaultValue={Math.min(50, selected.remainingWager)} required /></label><div className={styles.payoutHint}>Win pays <strong>2× your bet</strong> · {money(selected.remainingWager)} remaining</div><button className={styles.primaryButton} disabled={loading}>{loading ? "Placing…" : "Place bet"}</button></form></Modal>}
+    {modal === "topup" && <Modal title="Add virtual credits" onClose={closeModal}><form className={styles.form} onSubmit={(event) => { const data = new FormData(event.currentTarget); return submitAction(event, "/auth/onramp", { amount: Number(data.get("amount")) }, "Credits added"); }}><p className={styles.modalIntro}>This demo uses virtual credits. No payment is required.</p><label>Amount<input name="amount" type="number" min="1" defaultValue="1000" required /></label><button className={styles.primaryButton} disabled={loading}>{loading ? "Adding…" : "Add credits"}</button></form></Modal>}
+    {modal === "help" && <Modal title="How it works" onClose={closeModal}><div className={styles.howItWorks}><p>Create a market by choosing YES or NO and locking a starting wager.</p><p>Other users can bet the opposite side. The total opposing bets can never exceed the creator&apos;s stake.</p><p>If bettors win, each receives 2× their bet. If the creator wins, they receive their stake plus the opposing bets. Unmatched stake is returned where applicable.</p><button className={styles.primaryButton} onClick={closeModal}>Got it</button></div></Modal>}
+  </main>;
 }
+
+function MarketCard({ market, onBet, readOnly = false }: { market: Market; onBet: () => void; readOnly?: boolean }) { const creator = typeof market.creatorId === "string" ? "market maker" : market.creatorId.username; const percent = Math.round((market.matchedAmount / market.initialWager) * 100); return <article className={styles.marketCard}><div className={styles.cardTop}><span className={market.side === "yes" ? styles.yesPill : styles.noPill}>{market.side.toUpperCase()}</span><span className={styles.expiry}>Ends {date(market.expiresAt)}</span></div><h3>{market.title}</h3><p>{market.description || "A binary market. Choose your conviction and see how it resolves."}</p><div className={styles.cardMeta}><span>by <strong>@{creator}</strong></span><span>{money(market.initialWager)} at stake</span></div><div className={styles.capacity}><div><span>Matched</span><strong>{money(market.matchedAmount)}</strong></div><div><span>{percent}% filled</span><strong>{money(market.remainingWager)} left</strong></div></div><div className={styles.progress}><span style={{ width: `${percent}%` }} /></div><button className={styles.betButton} disabled={readOnly} onClick={onBet}>{readOnly ? "Admin view only" : <>Bet {market.side === "yes" ? "NO" : "YES"}<Icon name="arrow" size={15} /></>}</button></article>; }
+function Portfolio({ bets, markets }: { bets: Bet[]; markets: Market[] }) { return <><div className={styles.pageTitle}><div><div className={styles.eyebrow}>YOUR CONVICTION</div><h1>My portfolio</h1><p>Track every position and how it resolves.</p></div></div><div className={styles.statRow}><div><span>Open positions</span><strong>{bets.filter((bet) => bet.status === "open").length}</strong></div><div><span>Total wagered</span><strong>{money(bets.reduce((total, bet) => total + bet.amount, 0))}</strong></div><div><span>Markets available</span><strong>{markets.length}</strong></div></div><section className={styles.tableCard}><div className={styles.tableHeader}><span>Your positions</span><span>{bets.length} total</span></div>{bets.length ? bets.map((bet) => <div className={styles.position} key={bet._id}><div className={styles.positionIcon}>{bet.outcome === "yes" ? "Y" : "N"}</div><div className={styles.positionName}><strong>{typeof bet.marketId === "string" ? "Market position" : bet.marketId.title}</strong><small>{bet.outcome.toUpperCase()} · {date(bet.createdAt)}</small></div><span className={`${styles.status} ${bet.status === "won" ? styles.won : ""}`}>{bet.status}</span><strong>{money(bet.payout || bet.amount)}</strong></div>) : <div className={styles.emptySmall}>Your positions will appear here after you place a bet.</div>}</section></>; }
+function Wallet({ user, transactions, onTopUp }: { user: User | null; transactions: Transaction[]; onTopUp: () => void }) { return <><div className={styles.pageTitle}><div><div className={styles.eyebrow}>VIRTUAL WALLET</div><h1>Your balance</h1><p>Every wallet update and transaction is recorded atomically.</p></div><button className={styles.createButton} onClick={onTopUp}><Icon name="plus" size={16} />Add credits</button></div><div className={styles.walletBalance}><span>Available credits</span><strong>{money(user?.balance ?? 0)}</strong><small>Use them to take positions in any open market.</small></div><section className={styles.tableCard}><div className={styles.tableHeader}><span>Recent activity</span><span>Latest 100</span></div>{transactions.length ? transactions.map((item) => <div className={styles.transaction} key={item._id}><div className={styles.transactionIcon}>{item.amount >= 0 ? "↑" : "↓"}</div><div><strong>{item.type.replaceAll("_", " ")}</strong><small>{date(item.createdAt)}</small></div><strong className={item.amount >= 0 ? styles.credit : styles.debit}>{signedMoney(item.amount)}</strong></div>) : <div className={styles.emptySmall}>Your wallet activity will appear here.</div>}</section></>; }
+function Admin({ markets, users, onResolve, onCredit, loading }: { markets: Market[]; users: AdminUser[]; onResolve: (marketId: string, resolution: "yes" | "no") => void; onCredit: (userId: string) => void; loading: boolean }) { const expired = (value: string) => new Date(value).getTime() <= Date.now(); return <><div className={styles.pageTitle}><div><div className={styles.eyebrow}>ADMINISTRATION</div><h1>Admin console</h1><p>Review markets and resolve expired outcomes. Admin actions are audited through the same wallet ledger.</p></div></div><div className={styles.statRow}><div><span>Total users</span><strong>{users.length}</strong></div><div><span>Total markets</span><strong>{markets.length}</strong></div><div><span>Awaiting resolution</span><strong>{markets.filter((market) => expired(market.expiresAt) && market.status !== "resolved").length}</strong></div></div><section className={styles.tableCard}><div className={styles.tableHeader}><span>Market oversight</span><span>{markets.length} total</span></div>{markets.length ? markets.map((market) => <div className={styles.adminMarket} key={market._id}><div className={styles.positionIcon}>{market.side.toUpperCase()}</div><div className={styles.positionName}><strong>{market.title}</strong><small>{market.status} · creator: @{typeof market.creatorId === "string" ? "unknown" : market.creatorId.username} · expires {date(market.expiresAt)}</small></div>{market.status === "resolved" ? <span className={`${styles.status} ${styles.won}`}>{market.resolution} resolved</span> : expired(market.expiresAt) ? <div className={styles.resolveButtons}><button disabled={loading} onClick={() => onResolve(market._id, "yes")}>Resolve YES</button><button disabled={loading} onClick={() => onResolve(market._id, "no")}>Resolve NO</button></div> : <span className={styles.status}>open</span>}</div>) : <div className={styles.emptySmall}>No markets found.</div>}</section><section className={styles.tableCard}><div className={styles.tableHeader}><span>User accounts</span><span>{users.length} total</span></div>{users.map((account) => <div className={styles.adminMarket} key={account._id}><div className={styles.positionIcon}>@</div><div className={styles.positionName}><strong>{account.username} {account.role === "admin" ? "· admin" : ""}</strong><small>{money(account.balance)} · joined {date(account.createdAt)}</small></div><button className={styles.creditButton} disabled={loading || account.role === "admin"} onClick={() => onCredit(account._id)}>+1,000 credits</button></div>)}</section></>; }
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) { return <div className={styles.overlay} onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className={styles.modal}><button className={styles.close} onClick={onClose}><Icon name="close" /></button><h2>{title}</h2>{children}</div></div>; }

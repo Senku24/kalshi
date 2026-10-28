@@ -1,14 +1,6 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+:root { --background: #f8faf9; --foreground: #14211d; }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+html[data-theme="dark"], html[data-theme="dark"] body { background: #111916; color: #e5eee8; }
 
 html,
 body {
@@ -19,6 +11,7 @@ body {
 body {
   color: var(--foreground);
   background: var(--background);
+  font-family: var(--font-geist-sans), Arial, sans-serif;
 }
 
 * {
@@ -32,19 +25,3 @@ a {
   text-decoration: none;
 }
 
-.imgDark {
-  display: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
-
-  .imgLight {
-    display: none;
-  }
-  .imgDark {
-    display: unset;
-  }
-}
