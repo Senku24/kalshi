@@ -9,7 +9,7 @@ Kalshi is a small prediction-market app for trading opinions with virtual credit
 The main experience is a focused market board with search, YES/NO filters, stake progress, and a lightweight dark mode.
 
 ![Market discovery preview](docs/screenshots/market-discovery.svg)
-
+![alt text](image.png)
 The app also includes portfolio tracking, an atomic virtual wallet ledger, and an admin view for market resolution.
 
 ![Portfolio and wallet preview](docs/screenshots/portfolio-wallet.svg)
@@ -106,10 +106,3 @@ To run only the web app or API, use the commands in the setup section. The API h
 - Add virtual credits through the wallet screen.
 - Resolve expired markets as the creator or an admin.
 
-## Notes
-
-The repository still contains `apps/docs` as a secondary Next.js app from the original workspace scaffold. The primary product is `apps/web`, backed by `apps/api`.
-
-## License
-
-No license has been specified yet.
