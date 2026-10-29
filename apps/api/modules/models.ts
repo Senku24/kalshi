@@ -212,3 +212,4 @@ export const Bet =
 export const WalletEvent =
   models.WalletEvent ??
   model("WalletEvent", walletSchema, "walletEvents");
+  

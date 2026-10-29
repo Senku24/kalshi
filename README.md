@@ -1,159 +1,115 @@
-# Turborepo starter
+# Kalshi
 
-This Turborepo starter is maintained by the Turborepo core team.
+Kalshi is a small prediction-market app for trading opinions with virtual credits. Users can create binary YES/NO markets, take the opposite side of an open market, follow their positions, and review their wallet history. Admins get a separate console for resolving expired markets and crediting user accounts.
 
-## Using this example
+> This project uses virtual credits only. It is a learning/demo application, not a real-money trading platform.
 
-Run the following command:
+## Preview
 
-```sh
-npx create-turbo@latest
+The main experience is a focused market board with search, YES/NO filters, stake progress, and a lightweight dark mode.
+
+![Market discovery preview](docs/screenshots/market-discovery.svg)
+
+The app also includes portfolio tracking, an atomic virtual wallet ledger, and an admin view for market resolution.
+
+![Portfolio and wallet preview](docs/screenshots/portfolio-wallet.svg)
+
+## Stack
+
+- **Web:** Next.js 16, React 19, TypeScript
+- **API:** Express 5, TypeScript, Zod validation
+- **Data:** MongoDB with Mongoose
+- **Auth:** JWT tokens and bcrypt password hashing
+- **Workspace:** Bun workspaces and Turborepo
+- **Shared code:** `@repo/ui`, shared ESLint and TypeScript configs
+
+## Project structure
+
+```text
+apps/
+  web/       Next.js client application
+  api/       Express API and MongoDB models
+  docs/      Secondary Next.js docs/demo app
+packages/
+  ui/        Shared React components
+  eslint-config/
+  typescript-config/
 ```
 
-## What's inside?
+## Requirements
 
-This Turborepo includes the following packages/apps:
+- Node.js 24+
+- Bun 1.3.13+
+- A running MongoDB instance
 
-### Apps and Packages
+## Local setup
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+1. Install dependencies from the repository root:
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+   ```bash
+   bun install
+   ```
 
-### Utilities
+2. Create `apps/api/.env`:
 
-This Turborepo has some additional tools already setup for you:
+   ```dotenv
+   MONGODB_URI=mongodb://127.0.0.1:27017/kalshi
+   JWT_SECRET=replace-this-with-a-long-random-secret-at-least-32-characters
+   PORT=5000
+   CLIENT_URL=http://localhost:3001
+   ```
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+3. Point the web app at the API by creating `apps/web/.env.local`:
 
-### Build
+   ```dotenv
+   NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
+   ```
 
-To build all apps and packages, run the following command:
+4. Start the API and web app in separate terminals:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+   ```bash
+   bun --cwd apps/api index.ts
+   bun run dev --filter web
+   ```
 
-```sh
-cd my-turborepo
-turbo build
+5. Open [http://localhost:3001](http://localhost:3001).
+
+In development, the API seeds an admin account and demo markets on first startup:
+
+| Account | Username | Password |
+| --- | --- | --- |
+| Demo user | `demo` | `demo-password` |
+| Admin | `admin` | `admin-password` |
+
+Change these credentials before using the project outside local development.
+
+## Useful commands
+
+Run these from the repository root:
+
+```bash
+bun run dev          # start all development tasks
+bun run build        # build all apps and packages
+bun run lint         # lint the workspace
+bun run check-types  # run TypeScript checks
+bun run format       # format TypeScript and Markdown files
 ```
 
-Without global `turbo`, use your package manager:
+To run only the web app or API, use the commands in the setup section. The API health check is available at [http://localhost:5000/api/v1/health](http://localhost:5000/api/v1/health) and returns `{ "status": "ok" }` when the server is ready.
 
-```sh
-cd my-turborepo
-npx turbo build
-bun exec turbo build
-bun exec turbo build
-```
+## Core flows
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+- Sign up or sign in with a username and password.
+- Create a market with a question, expiry, side, and opening wager.
+- Bet the opposite side of another user's open market.
+- Review open positions and wallet transactions.
+- Add virtual credits through the wallet screen.
+- Resolve expired markets as the creator or an admin.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+## Notes
 
-```sh
-turbo build --filter=docs
-```
+The repository still contains `apps/docs` as a secondary Next.js app from the original workspace scaffold. The primary product is `apps/web`, backed by `apps/api`.
 
-Without global `turbo`:
+## License
 
-```sh
-npx turbo build --filter=docs
-bun exec turbo build --filter=docs
-bun exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-bun exec turbo dev
-bun exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-bun exec turbo dev --filter=web
-bun exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-bun exec turbo login
-bun exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-bun exec turbo link
-bun exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+No license has been specified yet.
